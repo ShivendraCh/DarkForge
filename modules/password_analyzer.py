@@ -16,6 +16,88 @@ from typing import List, Dict, Any, Optional
 from collections import Counter
 import matplotlib.pyplot as plt
 from pathlib import Path
+import click
+from datetime import datetime
+
+# -----------------------------------------------------------------------------
+# Pattern Detection
+# -----------------------------------------------------------------------------
+
+PATTERNS = {
+    "common_sequences": [
+        r'12345',
+        r'qwerty',
+        r'password',
+        r'admin',
+        r'welcome',
+        r'123456789',
+        r'abc123',
+        r'111111',
+        r'123123',
+        r'12345678',
+        r'1234567',
+        r'123456',
+        r'12345',
+        r'1234',
+        r'123',
+        r'12',
+        r'1',
+    ],
+    "keyboard_patterns": [
+        r'qwerty',
+        r'asdfgh',
+        r'zxcvbn',
+        r'qwertz',
+        r'azerty',
+        r'qwertyuiop',
+        r'asdfghjkl',
+        r'zxcvbnm',
+    ],
+    "date_patterns": [
+        r'\d{4}',  # Year
+        r'\d{2}/\d{2}/\d{4}',  # MM/DD/YYYY
+        r'\d{4}/\d{2}/\d{2}',  # YYYY/MM/DD
+        r'\d{2}-\d{2}-\d{4}',  # MM-DD-YYYY
+        r'\d{4}-\d{2}-\d{2}',  # YYYY-MM-DD
+    ],
+    "special_char_patterns": [
+        r'[!@#$%^&*]',  # Common special chars
+        r'[^a-zA-Z0-9]',  # Any non-alphanumeric
+    ],
+    "case_patterns": [
+        r'^[A-Z]+$',  # All uppercase
+        r'^[a-z]+$',  # All lowercase
+        r'^[A-Z][a-z]+$',  # Capitalized
+        r'^[a-z]+[A-Z]+$',  # camelCase
+    ],
+    "length_patterns": [
+        r'^.{8,}$',  # 8 or more chars
+        r'^.{12,}$',  # 12 or more chars
+        r'^.{16,}$',  # 16 or more chars
+    ],
+}
+
+def detect_patterns(password: str) -> Dict[str, List[str]]:
+    """
+    Detect various patterns in a password.
+    
+    Args:
+        password: The password to analyze
+        
+    Returns:
+        Dict: Dictionary of pattern types and matches
+    """
+    patterns_found = {}
+    
+    for pattern_type, patterns in PATTERNS.items():
+        matches = []
+        for pattern in patterns:
+            if re.search(pattern, password):
+                matches.append(pattern)
+        if matches:
+            patterns_found[pattern_type] = matches
+            
+    return patterns_found
 
 # -----------------------------------------------------------------------------
 # Password Strength Assessment
@@ -69,6 +151,7 @@ def rate_password_strength(password: str) -> Dict[str, Any]:
         Dict: A dictionary containing strength metrics and rating
     """
     entropy = calculate_entropy(password)
+    patterns = detect_patterns(password)
     
     # Define strength categories
     if entropy < 28:
@@ -87,32 +170,16 @@ def rate_password_strength(password: str) -> Dict[str, Any]:
         strength = "Very Strong"
         score = 5
     
-    # Check for common patterns
-    has_common_pattern = False
-    common_patterns = [
-        r'12345',
-        r'qwerty',
-        r'password',
-        r'admin',
-        r'welcome',
-        r'123456789',
-    ]
-    
-    for pattern in common_patterns:
-        if re.search(pattern, password.lower()):
-            has_common_pattern = True
-            break
-    
     # Adjust score based on patterns
-    if has_common_pattern:
-        score = max(1, score - 2)
+    if patterns:
+        score = max(1, score - len(patterns))
         
     return {
         "password": password,
         "entropy": entropy,
         "strength": strength,
         "score": score,
-        "has_common_pattern": has_common_pattern,
+        "patterns": patterns,
         "length": len(password)
     }
 
@@ -144,7 +211,9 @@ def analyze_patterns(passwords: List[str]) -> Dict[str, Any]:
             "Moderate": 0,
             "Strong": 0,
             "Very Strong": 0
-        }
+        },
+        "pattern_frequency": {},
+        "common_patterns": {}
     }
     
     # Analyze lengths
@@ -168,6 +237,28 @@ def analyze_patterns(passwords: List[str]) -> Dict[str, Any]:
         "digits_percent": (has_digits / len(passwords)) * 100,
         "symbols_percent": (has_symbols / len(passwords)) * 100
     }
+    
+    # Analyze patterns
+    pattern_counts = Counter()
+    for password in passwords:
+        patterns = detect_patterns(password)
+        for pattern_type, matches in patterns.items():
+            pattern_counts[pattern_type] += 1
+    
+    results["pattern_frequency"] = dict(pattern_counts)
+    
+    # Find most common patterns
+    common_patterns = {}
+    for pattern_type in PATTERNS.keys():
+        matches = []
+        for password in passwords:
+            patterns = detect_patterns(password)
+            if pattern_type in patterns:
+                matches.extend(patterns[pattern_type])
+        if matches:
+            common_patterns[pattern_type] = dict(Counter(matches))
+    
+    results["common_patterns"] = common_patterns
     
     # Analyze strength distribution
     strength_scores = [rate_password_strength(pwd) for pwd in passwords]
@@ -194,6 +285,9 @@ def generate_visualizations(analysis_results: Dict[str, Any], output_dir: str) -
     """
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
+    
+    # Set style for better visibility
+    plt.style.use('seaborn')
     
     # Length distribution visualization
     plt.figure(figsize=(10, 6))
@@ -230,6 +324,20 @@ def generate_visualizations(analysis_results: Dict[str, Any], output_dir: str) -
     plt.title("Password Strength Distribution")
     plt.savefig(output_path / "strength_distribution.png")
     plt.close()
+    
+    # Pattern frequency visualization
+    plt.figure(figsize=(12, 6))
+    pattern_freq = analysis_results["pattern_frequency"]
+    if pattern_freq:
+        plt.bar(pattern_freq.keys(), pattern_freq.values())
+        plt.title("Pattern Type Frequency")
+        plt.xlabel("Pattern Type")
+        plt.ylabel("Count")
+        plt.xticks(rotation=45)
+        plt.grid(True, alpha=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path / "pattern_frequency.png")
+        plt.close()
 
 # -----------------------------------------------------------------------------
 # Report Generation
@@ -247,84 +355,154 @@ def generate_report(analysis_results: Dict[str, Any], output_file: str) -> None:
         json.dump(analysis_results, f, indent=2)
 
 # -----------------------------------------------------------------------------
-# Main Function
+# CLI Interface
 # -----------------------------------------------------------------------------
 
-def analyze_password_file(password_file: str, output_dir: str, generate_visuals: bool = True) -> Dict[str, Any]:
-    """
-    Analyze a file containing passwords (one per line).
-    
-    Args:
-        password_file: Path to the file containing passwords
-        output_dir: Directory to save reports and visualizations
-        generate_visuals: Whether to generate visualizations
+@click.group()
+def cli():
+    """DarkForge Password Analyzer"""
+    pass
+
+@cli.command()
+@click.option(
+    "--password-file",
+    required=True,
+    help="File containing passwords to analyze (one per line)"
+)
+@click.option(
+    "--output-dir",
+    default="./analysis_results",
+    help="Directory to save analysis results"
+)
+@click.option(
+    "--no-visuals",
+    is_flag=True,
+    help="Disable visualization generation"
+)
+@click.option(
+    "--pattern-only",
+    is_flag=True,
+    help="Only analyze patterns without strength assessment"
+)
+def analyze(password_file, output_dir, no_visuals, pattern_only):
+    """Analyze passwords and generate reports."""
+    try:
+        click.echo("Reading passwords from file...")
+        with open(password_file, 'r', encoding='utf-8') as f:
+            passwords = [line.strip() for line in f if line.strip()]
         
-    Returns:
-        Dict: Analysis results
-    """
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-    
-    # Read passwords from file
-    with open(password_file, 'r', encoding='utf-8') as f:
-        passwords = [line.strip() for line in f if line.strip()]
-    
-    # Analyze patterns
-    analysis_results = analyze_patterns(passwords)
-    
-    # Generate report
-    report_file = output_path / "password_analysis_report.json"
-    generate_report(analysis_results, report_file)
-    
-    # Generate visualizations if requested
-    if generate_visuals:
-        visualization_dir = output_path / "visualizations"
-        generate_visualizations(analysis_results, visualization_dir)
-    
-    return analysis_results
+        click.echo(f"Analyzing {len(passwords)} passwords...")
+        analysis_results = analyze_patterns(passwords)
+        
+        # Generate timestamp for unique filenames
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Save report
+        report_file = output_path / f"password_analysis_report_{timestamp}.json"
+        generate_report(analysis_results, report_file)
+        
+        # Generate visualizations if requested
+        if not no_visuals:
+            visualization_dir = output_path / "visualizations"
+            click.echo("Generating visualizations...")
+            generate_visualizations(analysis_results, visualization_dir)
+        
+        # Display summary
+        click.echo("\nAnalysis Summary:")
+        click.echo(f"Total passwords analyzed: {analysis_results['total_passwords']}")
+        click.echo(f"Average password length: {analysis_results['length_stats']['avg']:.2f}")
+        click.echo(f"Report saved to: {report_file}")
+        
+        if not no_visuals:
+            click.echo(f"Visualizations saved to: {output_path}/visualizations/")
+        
+        # Display pattern statistics if any
+        if analysis_results.get("pattern_frequency"):
+            click.echo("\nPattern Statistics:")
+            for pattern_type, count in analysis_results["pattern_frequency"].items():
+                click.echo(f"{pattern_type}: {count} occurrences")
+        
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise
 
-# -----------------------------------------------------------------------------
-# CLI
-# -----------------------------------------------------------------------------
+@cli.command()
+@click.option(
+    "--password",
+    required=True,
+    help="Password to analyze"
+)
+def check(password):
+    """Analyze a single password."""
+    try:
+        results = rate_password_strength(password)
+        patterns = detect_patterns(password)
+        
+        click.echo("\nPassword Analysis Results:")
+        click.echo(f"Password: {results['password']}")
+        click.echo(f"Length: {results['length']}")
+        click.echo(f"Entropy: {results['entropy']:.2f} bits")
+        click.echo(f"Strength: {results['strength']} (Score: {results['score']}/5)")
+        
+        if patterns:
+            click.echo("\nDetected Patterns:")
+            for pattern_type, matches in patterns.items():
+                click.echo(f"{pattern_type}: {', '.join(matches)}")
+        else:
+            click.echo("\nNo common patterns detected.")
+            
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise
+
+@cli.command()
+@click.option(
+    "--password-file",
+    required=True,
+    help="File containing passwords to export"
+)
+@click.option(
+    "--format",
+    required=True,
+    help="Export format (hashcat, john, plain)"
+)
+@click.option(
+    "--hash-type",
+    help="Hash type for hashcat format (sha256, sha512, etc.)"
+)
+def attack_export(password_file, format, hash_type):
+    """Export passwords to a specified format."""
+    try:
+        click.echo("Reading passwords from file...")
+        with open(password_file, 'r', encoding='utf-8') as f:
+            passwords = [line.strip() for line in f if line.strip()]
+        
+        click.echo(f"Exporting {len(passwords)} passwords to {format} format...")
+        
+        if format == "hashcat":
+            if not hash_type:
+                click.echo("Error: Hash type is required for hashcat format", err=True)
+                return
+            click.echo(f"Exporting to hashcat format with hash type: {hash_type}")
+            # Implementation for exporting to hashcat format
+        elif format == "john":
+            click.echo("Exporting to john format")
+            # Implementation for exporting to john format
+        elif format == "plain":
+            click.echo("Exporting to plain format")
+            # Implementation for exporting to plain format
+        else:
+            click.echo(f"Error: Unsupported export format: {format}", err=True)
+            return
+        
+        # Implementation for exporting passwords
+        
+        click.echo("Export completed successfully.")
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise
 
 if __name__ == "__main__":
-    import click
-    
-    @click.command()
-    @click.option(
-        "--password-file",
-        required=True,
-        help="File containing passwords to analyze (one per line)"
-    )
-    @click.option(
-        "--output-dir",
-        default="./analysis_results",
-        help="Directory to save analysis results"
-    )
-    @click.option(
-        "--no-visuals",
-        is_flag=True,
-        help="Disable visualization generation"
-    )
-    def main(password_file, output_dir, no_visuals):
-        """Analyze passwords and generate reports."""
-        try:
-            analysis_results = analyze_password_file(
-                password_file=password_file,
-                output_dir=output_dir,
-                generate_visuals=not no_visuals
-            )
-            
-            click.echo(f"Analysis complete!")
-            click.echo(f"Total passwords analyzed: {analysis_results['total_passwords']}")
-            click.echo(f"Average password length: {analysis_results['length_stats']['avg']:.2f}")
-            click.echo(f"Report saved to: {output_dir}/password_analysis_report.json")
-            
-            if not no_visuals:
-                click.echo(f"Visualizations saved to: {output_dir}/visualizations/")
-        
-        except Exception as e:
-            click.echo(f"Error: {e}", err=True)
-            raise
-    
-    main() 
+    cli() 

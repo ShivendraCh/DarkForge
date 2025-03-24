@@ -3,7 +3,7 @@
 main.py
 
 Main entry point for the DarkForge toolkit. Provides a command-line interface for
-password generation based on user profile data.
+password generation, analysis, and attack simulation.
 
 Author: Shivendra Chauhan
 Date: 23rd March 2025
@@ -19,7 +19,8 @@ from pathlib import Path
 # Use relative imports from the darkforge package
 from modules.data_input.collector import UserProfile, get_user_profile
 from modules.pattern_generator import generate_passwords
-from modules.password_analyzer import analyze_password_file
+from modules.password_analyzer import cli as analyzer_cli
+from modules.attack_simulator import cli as attack_cli
 
 # Configure logging
 logging.basicConfig(
@@ -105,44 +106,9 @@ def collect(file_path):
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
 
-@cli.command()
-@click.option(
-    "--password-file",
-    required=True,
-    help="File containing passwords to analyze (one per line)"
-)
-@click.option(
-    "--output-dir",
-    default="./analysis_results",
-    help="Directory to save analysis results"
-)
-@click.option(
-    "--no-visuals",
-    is_flag=True,
-    help="Disable visualization generation"
-)
-def analyze(password_file, output_dir, no_visuals):
-    """Analyze passwords and generate reports."""
-    try:
-        click.echo("Analyzing passwords...")
-        analysis_results = analyze_password_file(
-            password_file=password_file,
-            output_dir=output_dir,
-            generate_visuals=not no_visuals
-        )
-        
-        click.echo(f"Analysis complete!")
-        click.echo(f"Total passwords analyzed: {analysis_results['total_passwords']}")
-        click.echo(f"Average password length: {analysis_results['length_stats']['avg']:.2f}")
-        click.echo(f"Report saved to: {output_dir}/password_analysis_report.json")
-        
-        if not no_visuals:
-            click.echo(f"Visualizations saved to: {output_dir}/visualizations/")
-    
-    except Exception as e:
-        logger.error(f"An error occurred: {e}", exc_info=True)
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)
+# Add the analyzer and attack simulator commands
+cli.add_command(analyzer_cli, name="analyze")
+cli.add_command(attack_cli, name="attack")
 
 if __name__ == "__main__":
     cli() 
