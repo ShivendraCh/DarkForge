@@ -19,7 +19,6 @@ from modules.data_input.collector import UserProfile, get_user_profile
 from modules.pattern_generator import generate_passwords, ALGORITHM_TEMPLATE, TRANSFORMATIONS
 from modules.password_analyzer import rate_password_strength, detect_patterns
 from modules.attack_simulator import export_hashcat_format, export_john_format, simulate_brute_force, simulate_dictionary_attack
-from modules.art import get_logo, get_section_art
 from modules.database import Database
 from datetime import datetime
 
@@ -41,8 +40,7 @@ CONFIG_PATH = BASE_DIR / "config" / "settings.json"
 
 def print_logo():
     """Print the DarkForge logo with color."""
-    logo = get_logo()
-    print(Fore.RED + logo)
+    print(Fore.RED + "DarkForge")
     print(Fore.CYAN + "DarkForge - Password Analysis and Generation Toolkit")
     print(Fore.CYAN + "=" * 60)
     print(Style.RESET_ALL)
@@ -90,7 +88,7 @@ def main_menu():
 def generate_menu():
     """Display the generate submenu."""
     clear_screen()
-    print(Fore.GREEN + get_section_art("password_generation"))
+    print(Fore.GREEN + "\nPASSWORD GENERATION")
     
     print(Fore.CYAN + "╔" + "═" * 58 + "╗")
     print(Fore.CYAN + "║" + Fore.GREEN + " GENERATE PASSWORDS MENU:".ljust(57) + Fore.CYAN + "║")
@@ -304,7 +302,7 @@ def generate_menu():
 def analyze_menu():
     """Display the analyze submenu."""
     clear_screen()
-    print(Fore.BLUE + get_section_art("password_analysis"))
+    print(Fore.BLUE + "\nPASSWORD ANALYSIS")
     
     print(Fore.CYAN + "╔" + "═" * 58 + "╗")
     print(Fore.CYAN + "║" + Fore.BLUE + " ANALYZE PASSWORDS MENU:".ljust(57) + Fore.CYAN + "║")
@@ -486,7 +484,7 @@ def analyze_menu():
 def export_menu():
     """Display the export formats submenu."""
     clear_screen()
-    print(Fore.MAGENTA + get_section_art("attack_simulation"))
+    print(Fore.MAGENTA + "\nEXPORT FORMATS")
     
     print(Fore.CYAN + "╔" + "═" * 58 + "╗")
     print(Fore.CYAN + "║" + Fore.MAGENTA + " EXPORT FORMATS MENU:".ljust(57) + Fore.CYAN + "║")
@@ -664,7 +662,7 @@ def export_menu():
 def history_menu():
     """Display the history submenu."""
     clear_screen()
-    print(Fore.CYAN + get_section_art("database"))
+    print(Fore.CYAN + "\nHISTORY")
     
     print(Fore.CYAN + "╔" + "═" * 58 + "╗")
     print(Fore.CYAN + "║" + Fore.CYAN + " HISTORY MENU:".ljust(57) + Fore.CYAN + "║")
@@ -802,7 +800,7 @@ def history_menu():
 def help_menu():
     """Display the help submenu."""
     clear_screen()
-    print(Fore.YELLOW + get_section_art("help"))
+    print(Fore.YELLOW + "\nHELP")
     
     print(Fore.CYAN + "╔" + "═" * 58 + "╗")
     print(Fore.CYAN + "║" + Fore.YELLOW + " HELP MENU:".ljust(57) + Fore.CYAN + "║")
